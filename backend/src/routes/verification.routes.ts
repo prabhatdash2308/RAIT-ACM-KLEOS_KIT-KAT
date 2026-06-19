@@ -77,7 +77,7 @@ router.get('/audit-logs', authenticate, requireMerchant, async (req: AuthRequest
 // Citizen routes
 router.post('/decode-qr', authenticate, requireCitizen, validateBody(qrDecodeSchema), async (req: AuthRequest, res, next) => {
   try {
-    const result = await verificationService.decodeQr(req.body.qrPayload);
+    const result = await verificationService.decodeQrForUser(req.user!.sub, req.body.qrPayload);
     res.json({ success: true, data: result });
   } catch (err) {
     next(err);
@@ -115,6 +115,15 @@ router.post('/consent/approve-anyway', authenticate, requireCitizen, validateBod
 router.post('/consent/reject', authenticate, requireCitizen, validateBody(consentSchema), async (req: AuthRequest, res, next) => {
   try {
     const result = await verificationService.rejectConsent(req.user!.sub, req.body.requestId);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/consent/quick-reverify', authenticate, requireCitizen, validateBody(consentSchema), async (req: AuthRequest, res, next) => {
+  try {
+    const result = await verificationService.quickReverify(req.user!.sub, req.body.requestId);
     res.json({ success: true, data: result });
   } catch (err) {
     next(err);

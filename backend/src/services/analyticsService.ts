@@ -150,11 +150,16 @@ export class AnalyticsService {
       prisma.auditLog.count(),
     ]);
 
+    const dpdpReady = await prisma.merchantTrustScore.count({ where: { dpdpReady: true } });
+    const leaks = await prisma.proofTrace.count({ where: { status: 'LEAKED' } });
+
     return {
       totalCitizens: citizens,
       totalMerchants: merchants,
       totalTransactions: transactions,
       totalAuditLogs: audits,
+      dpdpReadyMerchants: dpdpReady,
+      confirmedLeaks: leaks,
       privacyComplianceRate: 94,
     };
   }
@@ -253,6 +258,7 @@ export class AnalyticsService {
         privacyCompliance,
         totalRequests: requests.length,
         trend,
+        dpdpReady: score >= 85 && privacyCompliance >= 80 && complaints <= 3,
       },
       update: {
         score,
@@ -264,6 +270,7 @@ export class AnalyticsService {
         privacyCompliance,
         totalRequests: requests.length,
         trend,
+        dpdpReady: score >= 85 && privacyCompliance >= 80 && complaints <= 3,
       },
     });
   }

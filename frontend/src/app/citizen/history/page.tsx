@@ -1,14 +1,14 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { History, RotateCcw, Download } from 'lucide-react';
+import { History, RotateCcw, Download, FileText } from 'lucide-react';
 import { useToast } from '@/components/ui/toaster';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DashboardNav } from '@/components/layout/navbar';
 import { useAuthStore } from '@/lib/store';
-import { walletApi } from '@/lib/api';
+import { walletApi, privacyApi } from '@/lib/api';
 import { ATTRIBUTE_LABELS, formatDate } from '@/lib/utils';
 
 const navLinks = [
@@ -79,6 +79,25 @@ export default function HistoryPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={statusVariant(item.status)}>{item.status}</Badge>
+                  {item.status === 'APPROVED' && token && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const res = await fetch(privacyApi.downloadReceipt(token, item.id), {
+                          headers: { Authorization: `Bearer ${token}` },
+                        });
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `privacy-receipt-${item.id}.html`;
+                        a.click();
+                      }}
+                    >
+                      <FileText className="h-3 w-3" /> Receipt
+                    </Button>
+                  )}
                   {item.canRevoke && (
                     <Button variant="outline" size="sm" onClick={() => revokeMutation.mutate(item.id)}>
                       <RotateCcw className="h-3 w-3" /> Revoke

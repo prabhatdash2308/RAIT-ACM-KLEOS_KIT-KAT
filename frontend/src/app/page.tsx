@@ -181,6 +181,28 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Testimonials */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-12">Trusted by Privacy-Conscious Organizations</h2>
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {[
+              { quote: 'DigiRakshak let us verify age without ever seeing a customer\'s Aadhaar. DPDP compliance became effortless.', author: 'HealthPlus Pharmacy', role: 'Retail Healthcare' },
+              { quote: 'Our hotel only needs state residency proof. Citizens love the transparency meter showing what we never receive.', author: 'Grand Vista Hotel', role: 'Hospitality' },
+              { quote: 'The PrivacyTrace engine gives us audit confidence. Leak investigation is built-in from day one.', author: 'SecureBank India', role: 'Banking & KYC' },
+            ].map((t) => (
+              <Card key={t.author} className="premium-card">
+                <CardContent className="pt-6">
+                  <p className="text-sm italic text-muted-foreground mb-4">&ldquo;{t.quote}&rdquo;</p>
+                  <p className="font-semibold text-sm">{t.author}</p>
+                  <p className="text-xs text-muted-foreground">{t.role}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Privacy Principles */}
       <section className="py-20 bg-muted/30">
         <div className="container mx-auto px-4">

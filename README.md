@@ -102,6 +102,21 @@ Password for all: `Demo@123`
 
 ## Core Features
 
+### Advanced Privacy Features
+
+- **Explainable AI Privacy Assistant** — Risk levels, over-collection detection, minimum disclosure recommendations
+- **Privacy Score** — Dynamic 0–100 score with monthly trends and AI suggestions
+- **Merchant Trust Score** — Weighted scoring with DPDP Ready badge (≥85 compliance)
+- **DPDP Compliance Dashboard** — Consent, purpose limitation, data minimization, storage limitation, audit readiness
+- **Transparency Meter** — Requested vs shared data, privacy saved %, leak prevention
+- **Privacy Receipt** — Downloadable HTML receipt with transaction ID and DPDP status
+- **PrivacyTrace Engine** — Unique proof IDs with digital signatures; admin leak investigation
+- **Auto-Expiring Proofs** — 5-minute, one-time use with replay protection
+- **Merchant Risk Alerts** — Warnings for low trust or over-collection merchants
+- **One-Click Reverification** — Trusted merchant fast-track with explicit consent
+- **Emergency Verification Mode** — Minimal emergency profile sharing (fully auditable)
+- **Universal Credential Support** — Aadhaar, DigiLocker, PAN, DL, ABHA, Student ID, Employee ID, University Certificates
+
 ### Citizen
 - Credential wallet with derived attributes only
 - QR scanning with animated scanner UI

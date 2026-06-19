@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { DashboardNav } from '@/components/layout/navbar';
 import { useAuthStore } from '@/lib/store';
 import { analyticsApi } from '@/lib/api';
+import { DPDPReadyBadge } from '@/components/features/dpdp-badge';
 import { ATTRIBUTE_LABELS } from '@/lib/utils';
 
 const navLinks = [
@@ -39,7 +40,10 @@ export default function MerchantDashboard() {
       <DashboardNav links={navLinks} />
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-bold mb-2">Merchant Dashboard</h1>
+        <div className="flex flex-wrap items-center gap-3 mb-2">
+          <h1 className="text-3xl font-bold">Merchant Dashboard</h1>
+          <DPDPReadyBadge trustScore={data?.trustScore} />
+        </div>
         <p className="text-muted-foreground mb-8">Privacy-compliant identity verification</p>
       </motion.div>
 

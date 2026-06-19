@@ -77,6 +77,9 @@ export const walletApi = {
   revoke: (token: string, id: string) => api(`/wallet/history/${id}/revoke`, { method: 'POST', token }),
   exportHistory: (token: string, format: 'json' | 'csv' = 'json') =>
     api(`/wallet/history/export?format=${format}`, { token }),
+  getCredentials: (token: string) => api('/wallet/credentials', { token }),
+  importCredential: (token: string, data: { credentialType: string; data?: Record<string, unknown>; label?: string }) =>
+    api('/wallet/import-credential', { method: 'POST', body: data, token }),
 };
 
 export const verificationApi = {
@@ -97,6 +100,8 @@ export const verificationApi = {
   results: (token: string, requestId: string) =>
     api(`/verification/results/${requestId}`, { token }),
   auditLogs: (token: string) => api('/verification/audit-logs', { token }),
+  quickReverify: (token: string, requestId: string) =>
+    api('/verification/consent/quick-reverify', { method: 'POST', body: { requestId }, token }),
 };
 
 export interface CitizenDashboard {
@@ -144,6 +149,18 @@ export interface AdminDashboard {
   totalTransactions: number;
   totalAuditLogs: number;
   privacyComplianceRate: number;
+  dpdpReadyMerchants?: number;
+  confirmedLeaks?: number;
+}
+
+export interface DPDPCompliance {
+  consentScore: number;
+  purposeLimitation: number;
+  dataMinimization: number;
+  storageLimitation: number;
+  auditReadiness: number;
+  dpdpCompliancePercent: number;
+  metrics: { name: string; value: number; weight: string; status?: string }[];
 }
 
 export const analyticsApi = {
@@ -155,4 +172,20 @@ export const analyticsApi = {
   adminMerchants: (token: string) => api('/analytics/admin/merchants', { token }),
   adminCitizens: (token: string) => api('/analytics/admin/citizens', { token }),
   adminAuditLogs: (token: string) => api('/analytics/admin/audit-logs', { token }),
+};
+
+export const privacyApi = {
+  citizenCompliance: (token: string) => api<DPDPCompliance>('/privacy/citizen/compliance', { token }),
+  getReceipt: (token: string, consentId: string) => api(`/privacy/citizen/receipt/${consentId}`, { token }),
+  downloadReceipt: (token: string, consentId: string) =>
+    `${API_URL}/privacy/citizen/receipt/${consentId}/download`,
+  trustedMerchants: (token: string) => api('/privacy/citizen/trusted-merchants', { token }),
+  emergencyActivate: (token: string, institution: string) =>
+    api('/privacy/citizen/emergency', { method: 'POST', body: { institution }, token }),
+  emergencyHistory: (token: string) => api('/privacy/citizen/emergency/history', { token }),
+  adminCompliance: (token: string) => api<DPDPCompliance & { dpdpReadyMerchants: number; confirmedLeaks: number }>('/privacy/admin/compliance', { token }),
+  adminLeakInvestigation: (token: string) => api('/privacy/admin/leak-investigation', { token }),
+  adminTraceProof: (token: string, proofId: string) => api(`/privacy/admin/trace/${proofId}`, { token }),
+  adminReportLeak: (token: string, proofId: string) =>
+    api('/privacy/admin/leak-report', { method: 'POST', body: { proofId }, token }),
 };

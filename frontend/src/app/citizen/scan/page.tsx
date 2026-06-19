@@ -12,6 +12,7 @@ import { DashboardNav } from '@/components/layout/navbar';
 import { AIAssistantPanel } from '@/components/features/ai-assistant-panel';
 import { TransparencyMeter } from '@/components/features/transparency-meter';
 import { TrustStars } from '@/components/features/trust-stars';
+import { DPDPReadyBadge, MerchantRiskAlert } from '@/components/features/dpdp-badge';
 import { VerificationSuccessModal } from '@/components/features/success-modal';
 import { useToast } from '@/components/ui/toaster';
 import { useAuthStore } from '@/lib/store';
@@ -29,10 +30,12 @@ const navLinks = [
 
 interface ScanResult {
   requestId: string;
-  merchant: { businessName: string; businessType: string; trustScore: number; trustStars?: number };
+  merchant: { businessName: string; businessType: string; trustScore: number; trustStars?: number; dpdpReady?: boolean };
   purpose: string;
   attributes: { attribute: string; reason: string }[];
   expiresAt: string;
+  merchantRiskAlert?: { level: string; message: string } | null;
+  trustedMerchant?: { isTrusted: boolean; canQuickApprove?: boolean; priorApprovals?: number };
   aiAnalysis: {
     riskLevel: string;
     recommendation: string;
@@ -73,6 +76,25 @@ export default function ScanPage() {
       toast({ title: 'Invalid QR', description: err instanceof ApiError ? err.message : 'QR decode failed', variant: 'destructive' });
     } finally {
       setScanning(false);
+    }
+  };
+
+  const handleQuickReverify = async () => {
+    if (!token || !result) return;
+    setActionLoading(true);
+    try {
+      const response = await verificationApi.quickReverify(token, result.requestId) as { proofs: { attribute: string; value: string }[] };
+      setSuccessProofs(response.proofs.map((p) => ({
+        attribute: ATTRIBUTE_LABELS[p.attribute] || p.attribute,
+        value: p.value,
+      })));
+      setSuccessMode('QUICK_REVERIFY');
+      setSuccessOpen(true);
+      toast({ title: 'Quick Reverification', description: 'Trusted merchant — consent approved instantly.', variant: 'success' });
+    } catch (err) {
+      toast({ title: 'Quick Reverify Failed', description: err instanceof ApiError ? err.message : 'Failed', variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -153,7 +175,10 @@ export default function ScanPage() {
                 <p className="text-sm text-muted-foreground">Merchant</p>
                 <p className="font-semibold text-xl">{result.merchant.businessName}</p>
                 <p className="text-sm text-muted-foreground">{result.merchant.businessType}</p>
-                <TrustStars score={result.merchant.trustScore} className="mt-2" />
+                <div className="flex items-center gap-2 mt-2">
+                  <TrustStars score={result.merchant.trustScore} />
+                  <DPDPReadyBadge dpdpReady={result.merchant.dpdpReady} trustScore={result.merchant.trustScore} size="sm" />
+                </div>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Purpose</p>
@@ -170,6 +195,24 @@ export default function ScanPage() {
               </div>
             </CardContent>
           </Card>
+
+          <MerchantRiskAlert alert={result.merchantRiskAlert ?? null} />
+
+          {result.trustedMerchant?.canQuickApprove && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="pt-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="font-semibold">One-Click Reverification</p>
+                  <p className="text-sm text-muted-foreground">
+                    You&apos;ve approved {result.trustedMerchant.priorApprovals} prior request(s) from this merchant.
+                  </p>
+                </div>
+                <Button onClick={handleQuickReverify} disabled={actionLoading} className="gap-2">
+                  Quick Approve
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           <AIAssistantPanel analysis={result.aiAnalysis} />
 

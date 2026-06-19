@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.routes';
 import walletRoutes from './routes/wallet.routes';
 import verificationRoutes from './routes/verification.routes';
 import analyticsRoutes from './routes/analytics.routes';
+import privacyRoutes from './routes/privacy.routes';
 
 validateEnv();
 
@@ -48,6 +49,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/verification', verificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/privacy', privacyRoutes);
 
 app.use((_req, _res, next) => {
   next(new AppError('Route not found', 404));

@@ -14,6 +14,8 @@ const navLinks = [
   { href: '/admin/dashboard', label: 'Dashboard' },
   { href: '/admin/merchants', label: 'Merchants' },
   { href: '/admin/citizens', label: 'Citizens' },
+  { href: '/admin/compliance', label: 'Compliance' },
+  { href: '/admin/leak-investigation', label: 'Leak Investigation' },
   { href: '/admin/audit-logs', label: 'Audit Logs' },
 ];
 

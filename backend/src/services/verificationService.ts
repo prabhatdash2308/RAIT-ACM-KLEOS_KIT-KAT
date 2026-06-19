@@ -8,6 +8,9 @@ import { AppError } from '../middleware/errorHandler';
 import { privacyAssistant } from './privacyAssistant';
 import { analyticsService } from './analyticsService';
 import { transparencyService } from './transparencyService';
+import { privacyTraceService } from './privacyTraceService';
+import { privacyReceiptService } from './privacyReceiptService';
+import { reverificationService } from './reverificationService';
 
 export class VerificationService {
   async createRequest(
@@ -112,6 +115,17 @@ export class VerificationService {
       trustScore
     );
 
+    const merchantRiskAlert =
+      trustScore < 50 || aiAnalysis.unnecessaryAttributes.length >= 2
+        ? {
+            level: trustScore < 40 ? 'CRITICAL' : 'HIGH',
+            message:
+              trustScore < 50
+                ? 'This merchant has a low trust score. Review carefully before sharing data.'
+                : 'This merchant frequently requests unnecessary data. Consider sharing minimum only.',
+          }
+        : null;
+
     return {
       requestId: request.id,
       merchant: {
@@ -120,12 +134,20 @@ export class VerificationService {
         businessType: request.merchant.businessType,
         trustScore,
         trustStars: Math.round(trustScore / 20),
+        dpdpReady: request.merchant.trustScore?.dpdpReady ?? false,
       },
       purpose: request.purpose,
       attributes: request.requestedAttributes,
       expiresAt: request.expiresAt,
       aiAnalysis,
+      merchantRiskAlert,
     };
+  }
+
+  async decodeQrForUser(userId: string, qrPayload: string) {
+    const decoded = await this.decodeQr(qrPayload);
+    const trusted = await reverificationService.isTrustedMerchant(userId, decoded.merchant.id);
+    return { ...decoded, trustedMerchant: trusted };
   }
 
   async approveConsent(
@@ -184,6 +206,7 @@ export class VerificationService {
     };
 
     const proofs = [];
+    const proofIds: string[] = [];
     const expiresAt = new Date(Date.now() + config.proofExpiryMinutes * 60 * 1000);
     const sharedFieldLabels = attrsToShare.map((a) => ATTRIBUTE_LABELS[a.attribute]);
 
@@ -201,7 +224,19 @@ export class VerificationService {
           expiresAt,
         },
       });
-      proofs.push(proof);
+
+      const trace = await privacyTraceService.createTrace({
+        proofTokenId: proof.id,
+        merchantId: request.merchantId,
+        verificationRequestId: requestId,
+        consentId: consent.id,
+        userId,
+        nonce: request.nonce,
+        attribute: attr.attribute,
+        value,
+      });
+      proofIds.push(trace.proofId);
+      proofs.push({ ...proof, proofId: trace.proofId });
 
       await prisma.transaction.create({
         data: {
@@ -235,6 +270,19 @@ export class VerificationService {
 
     await analyticsService.updatePrivacyScore(userId, unnecessaryCount, sharedFieldLabels.length, mode);
     await analyticsService.updateMerchantTrustScore(request.merchantId);
+    await reverificationService.addTrustedMerchant(userId, request.merchantId);
+
+    const receipt = await privacyReceiptService.createReceipt({
+      consentId: consent.id,
+      userId,
+      merchantId: request.merchantId,
+      merchantName: request.merchant.businessName,
+      purpose: request.purpose,
+      requestedAttributes: request.requestedAttributes.map((a) => a.attribute),
+      sharedAttributes: attrsToShare.map((a) => a.attribute),
+      proofIds,
+      dpdpCompliant: unnecessaryCount === 0 || mode === 'MINIMUM',
+    });
 
     await prisma.auditLog.create({
       data: {
@@ -250,13 +298,33 @@ export class VerificationService {
       consent,
       mode,
       transparency: aiAnalysis.transparency,
+      receipt: {
+        transactionId: receipt.transactionId,
+        dpdpCompliant: receipt.dpdpCompliant,
+      },
       proofs: proofs.map((p) => ({
         attribute: p.attribute,
         value: p.value,
         proofHash: p.proofHash,
+        proofId: p.proofId,
         expiresAt: p.expiresAt,
       })),
     };
+  }
+
+  async quickReverify(userId: string, requestId: string) {
+    const request = await prisma.verificationRequest.findUnique({
+      where: { id: requestId },
+      include: { merchant: true },
+    });
+    if (!request) throw new AppError('Request not found', 404);
+
+    const trusted = await reverificationService.isTrustedMerchant(userId, request.merchantId);
+    if (!trusted.canQuickApprove) {
+      throw new AppError('One-click reverification not available. Prior consent required.', 403);
+    }
+
+    return this.approveConsent(userId, requestId, 'FULL');
   }
 
   async rejectConsent(userId: string, requestId: string) {
@@ -301,6 +369,8 @@ export class VerificationService {
       where: { id: proof.id },
       data: { usedAt: new Date() },
     });
+
+    await privacyTraceService.markProofUsed(proof.id);
 
     await prisma.auditLog.create({
       data: {

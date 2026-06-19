@@ -8,8 +8,9 @@ import { Progress } from '@/components/ui/progress';
 import { DashboardNav } from '@/components/layout/navbar';
 import { TransparencyMeter } from '@/components/features/transparency-meter';
 import { DashboardSkeleton } from '@/components/ui/skeleton';
+import { DPDPComplianceDashboard } from '@/components/features/dpdp-compliance-dashboard';
 import { useAuthStore } from '@/lib/store';
-import { analyticsApi } from '@/lib/api';
+import { analyticsApi, privacyApi } from '@/lib/api';
 
 const navLinks = [
   { href: '/citizen/dashboard', label: 'Dashboard' },
@@ -31,6 +32,12 @@ export default function PrivacyPage() {
   const { data: transparency } = useQuery({
     queryKey: ['citizen-transparency'],
     queryFn: () => analyticsApi.citizenTransparency(token!),
+    enabled: !!token,
+  });
+
+  const { data: compliance } = useQuery({
+    queryKey: ['citizen-compliance'],
+    queryFn: () => privacyApi.citizenCompliance(token!),
     enabled: !!token,
   });
 
@@ -69,6 +76,12 @@ export default function PrivacyPage() {
           </CardContent>
         </Card>
       </div>
+
+      {compliance && (
+        <div className="mb-8">
+          <DPDPComplianceDashboard data={compliance} />
+        </div>
+      )}
 
       {transparency && (
         <div className="mb-8">

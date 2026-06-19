@@ -23,6 +23,25 @@ enum AttributeType {
   PINCODE_MATCH
 }
 
+enum CredentialType {
+  AADHAAR
+  DIGILOCKER
+  STUDENT_ID
+  PAN
+  DRIVING_LICENCE
+  ABHA
+  EMPLOYEE_ID
+  UNIVERSITY_CERTIFICATE
+  CUSTOM
+}
+
+enum ProofTraceStatus {
+  ACTIVE
+  EXPIRED
+  USED
+  LEAKED
+}
+
 enum ConsentMode {
   FULL
   MINIMUM
@@ -71,6 +90,9 @@ model User {
   notifications Notification[]
   transactions  Transaction[]
   transparencyLogs TransparencyLog[]
+  proofTraces   ProofTrace[]
+  trustedMerchants TrustedMerchant[]
+  emergencyVerifications EmergencyVerification[]
 
   @@map("users")
 }
@@ -92,6 +114,8 @@ model Merchant {
   transactions         Transaction[]
   trustScore           MerchantTrustScore?
   notifications        Notification[]
+  proofTraces          ProofTrace[]
+  trustedBy            TrustedMerchant[]
 
   @@map("merchants")
 }
@@ -117,13 +141,16 @@ model Wallet {
 }
 
 model Credential {
-  id          String        @id @default(cuid())
-  walletId    String
-  attribute   AttributeType
-  value       String
-  proofHash   String
-  expiresAt   DateTime?
-  createdAt   DateTime      @default(now())
+  id             String         @id @default(cuid())
+  walletId       String
+  credentialType CredentialType @default(AADHAAR)
+  issuer         String?
+  label          String?
+  attribute      AttributeType
+  value          String
+  proofHash      String
+  expiresAt      DateTime?
+  createdAt      DateTime       @default(now())
 
   wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
@@ -146,6 +173,7 @@ model VerificationRequest {
   consents            Consent[]
   proofTokens         ProofToken[]
   auditLogs           AuditLog[]
+  proofTraces         ProofTrace[]
 
   @@map("verification_requests")
 }
@@ -166,6 +194,7 @@ model ProofToken {
   id                    String        @id @default(cuid())
   verificationRequestId String
   consentId             String?
+  proofId               String?       @unique
   attribute             AttributeType
   value                 String
   proofHash             String        @unique
@@ -175,6 +204,7 @@ model ProofToken {
 
   verificationRequest VerificationRequest @relation(fields: [verificationRequestId], references: [id], onDelete: Cascade)
   consent             Consent?            @relation(fields: [consentId], references: [id])
+  proofTrace          ProofTrace?
 
   @@map("proof_tokens")
 }
@@ -198,6 +228,8 @@ model Consent {
   verificationRequest VerificationRequest @relation(fields: [verificationRequestId], references: [id], onDelete: Cascade)
   proofTokens         ProofToken[]
   transactions        Transaction[]
+  proofTraces         ProofTrace[]
+  privacyReceipts     PrivacyReceipt[]
 
   @@map("consents")
 }
@@ -267,11 +299,86 @@ model MerchantTrustScore {
   privacyCompliance   Float    @default(0)
   totalRequests       Int      @default(0)
   trend               Float    @default(0)
+  dpdpReady           Boolean  @default(false)
+  leakCount           Int      @default(0)
+  confirmedLeaks      Int      @default(0)
   updatedAt           DateTime @updatedAt
 
   merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@map("merchant_trust_scores")
+}
+
+model ProofTrace {
+  id                    String           @id @default(cuid())
+  proofId               String           @unique
+  proofTokenId          String           @unique
+  merchantId            String
+  verificationRequestId String
+  consentId             String?
+  userId                String
+  nonce                 String
+  digitalSignature      String
+  timestamp             DateTime         @default(now())
+  status                ProofTraceStatus @default(ACTIVE)
+  leakedAt              DateTime?
+  leakReportedBy        String?
+
+  merchant            Merchant            @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  verificationRequest VerificationRequest @relation(fields: [verificationRequestId], references: [id], onDelete: Cascade)
+  consent             Consent?            @relation(fields: [consentId], references: [id])
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proofToken          ProofToken          @relation(fields: [proofTokenId], references: [id], onDelete: Cascade)
+
+  @@map("proof_traces")
+}
+
+model PrivacyReceipt {
+  id                    String   @id @default(cuid())
+  transactionId         String   @unique
+  consentId             String
+  userId                String
+  merchantId            String
+  merchantName          String
+  purpose               String
+  requestedData         Json
+  sharedData            Json
+  protectedData         Json
+  dpdpCompliant         Boolean  @default(true)
+  proofIds              Json
+  createdAt             DateTime @default(now())
+
+  consent Consent @relation(fields: [consentId], references: [id], onDelete: Cascade)
+
+  @@map("privacy_receipts")
+}
+
+model TrustedMerchant {
+  id         String   @id @default(cuid())
+  userId     String
+  merchantId String
+  approvedAt DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, merchantId])
+  @@map("trusted_merchants")
+}
+
+model EmergencyVerification {
+  id          String   @id @default(cuid())
+  userId      String
+  institution String
+  attributes  Json
+  proofHash   String
+  auditHash   String
+  usedAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("emergency_verifications")
 }
 
 model TransparencyLog {

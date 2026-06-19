@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { CredentialType } from '@prisma/client';
 import { disclosureEngine } from '../services/disclosureEngine';
 import { prisma } from '../lib/prisma';
 import { validateBody } from '../middleware/validate';
@@ -13,6 +14,12 @@ const importXmlSchema = z.object({
   isStudent: z.boolean().optional(),
 });
 
+const importCredentialSchema = z.object({
+  credentialType: z.nativeEnum(CredentialType),
+  data: z.record(z.unknown()).optional(),
+  label: z.string().optional(),
+});
+
 router.use(authenticate, requireCitizen);
 
 router.get('/', async (req: AuthRequest, res, next) => {
@@ -22,6 +29,29 @@ router.get('/', async (req: AuthRequest, res, next) => {
       return res.json({ success: true, data: { wallet: null, hasWallet: false } });
     }
     res.json({ success: true, data: { wallet: disclosureEngine.sanitizeWallet(wallet), hasWallet: true } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/credentials', async (req: AuthRequest, res, next) => {
+  try {
+    const credentials = await disclosureEngine.getWalletCredentials(req.user!.sub);
+    res.json({ success: true, data: credentials });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/import-credential', validateBody(importCredentialSchema), async (req: AuthRequest, res, next) => {
+  try {
+    const result = await disclosureEngine.importCredential(
+      req.user!.sub,
+      req.body.credentialType,
+      req.body.data || {},
+      req.body.label
+    );
+    res.json({ success: true, data: result });
   } catch (err) {
     next(err);
   }

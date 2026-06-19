@@ -46,8 +46,10 @@ DATABASE_URL="your-neon-url" npm run db:seed
 
 1. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
 2. Select `prabhatdash2308/digirakhshak`
-3. Set **Root Directory** to `backend`
-4. Railway reads `backend/railway.toml` automatically
+3. **Important:** leave **Root Directory empty** (repo root — `/`)
+   - Railway reads `railway.toml` at the repo root and builds via `docker/Dockerfile.backend`
+   - This includes the `prisma/` folder required for migrations
+4. If Root Directory is set to `backend`, change it to **empty/repo root** in **Settings → Source → Root Directory**
 
 ### Environment Variables
 

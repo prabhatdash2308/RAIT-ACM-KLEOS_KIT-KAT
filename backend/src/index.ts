@@ -4,11 +4,14 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { config } from './config';
+import { validateEnv } from './lib/validateEnv';
 import { errorHandler, AppError } from './middleware/errorHandler';
 import authRoutes from './routes/auth.routes';
 import walletRoutes from './routes/wallet.routes';
 import verificationRoutes from './routes/verification.routes';
 import analyticsRoutes from './routes/analytics.routes';
+
+validateEnv();
 
 const app = express();
 

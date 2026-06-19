@@ -1,0 +1,360 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../backend/node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CITIZEN
+  MERCHANT
+  ADMIN
+}
+
+enum AttributeType {
+  AGE_OVER_18
+  STATE
+  FEMALE
+  STUDENT
+  IDENTITY_VERIFIED
+  PINCODE_MATCH
+}
+
+enum ConsentMode {
+  FULL
+  MINIMUM
+  OVERRIDE
+}
+
+enum ConsentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  REVOKED
+}
+
+enum VerificationStatus {
+  PENDING
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+enum NotificationType {
+  CONSENT_REQUEST
+  PROOF_SHARED
+  CONSENT_REVOKED
+  SYSTEM
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  phone         String?
+  role          UserRole  @default(CITIZEN)
+  isVerified    Boolean   @default(false)
+  onboardingComplete Boolean @default(false)
+  demoMode      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  wallet        Wallet?
+  consents      Consent[]
+  sessions      Session[]
+  privacyScores PrivacyScore[]
+  notifications Notification[]
+  transactions  Transaction[]
+  transparencyLogs TransparencyLog[]
+
+  @@map("users")
+}
+
+model Merchant {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String
+  businessName    String
+  gstNumber       String?
+  businessType    String
+  isVerified      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  verificationRequests VerificationRequest[]
+  consents             Consent[]
+  auditLogs            AuditLog[]
+  transactions         Transaction[]
+  trustScore           MerchantTrustScore?
+  notifications        Notification[]
+
+  @@map("merchants")
+}
+
+model Wallet {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  identityVerified Boolean @default(false)
+  ageOver18       Boolean  @default(false)
+  state           String?
+  isFemale        Boolean  @default(false)
+  isStudent       Boolean  @default(false)
+  pincode         String?
+  sourceHash      String?
+  importedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentials Credential[]
+
+  @@map("wallets")
+}
+
+model Credential {
+  id          String        @id @default(cuid())
+  walletId    String
+  attribute   AttributeType
+  value       String
+  proofHash   String
+  expiresAt   DateTime?
+  createdAt   DateTime      @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@map("credentials")
+}
+
+model VerificationRequest {
+  id          String             @id @default(cuid())
+  merchantId  String
+  purpose     String
+  nonce       String             @unique
+  signature   String
+  status      VerificationStatus @default(PENDING)
+  expiresAt   DateTime
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  merchant            Merchant             @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  requestedAttributes RequestedAttribute[]
+  consents            Consent[]
+  proofTokens         ProofToken[]
+  auditLogs           AuditLog[]
+
+  @@map("verification_requests")
+}
+
+model RequestedAttribute {
+  id                    String        @id @default(cuid())
+  verificationRequestId String
+  attribute             AttributeType
+  reason                String
+  pincodeValue          String?
+
+  verificationRequest VerificationRequest @relation(fields: [verificationRequestId], references: [id], onDelete: Cascade)
+
+  @@map("requested_attributes")
+}
+
+model ProofToken {
+  id                    String        @id @default(cuid())
+  verificationRequestId String
+  consentId             String?
+  attribute             AttributeType
+  value                 String
+  proofHash             String        @unique
+  expiresAt             DateTime
+  usedAt                DateTime?
+  createdAt             DateTime      @default(now())
+
+  verificationRequest VerificationRequest @relation(fields: [verificationRequestId], references: [id], onDelete: Cascade)
+  consent             Consent?            @relation(fields: [consentId], references: [id])
+
+  @@map("proof_tokens")
+}
+
+model Consent {
+  id                    String        @id @default(cuid())
+  userId                String
+  merchantId            String
+  verificationRequestId String
+  status                ConsentStatus @default(PENDING)
+  aiRecommendation      String?
+  riskLevel             String?
+  privacyScoreImpact    Float?
+  consentMode           ConsentMode?
+  revokedAt             DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  merchant            Merchant            @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  verificationRequest VerificationRequest @relation(fields: [verificationRequestId], references: [id], onDelete: Cascade)
+  proofTokens         ProofToken[]
+  transactions        Transaction[]
+
+  @@map("consents")
+}
+
+model AuditLog {
+  id                    String   @id @default(cuid())
+  merchantId            String?
+  verificationRequestId String?
+  action                String
+  attribute             String?
+  status                String
+  dataHash              String
+  metadata              Json?
+  createdAt             DateTime @default(now())
+
+  merchant            Merchant?            @relation(fields: [merchantId], references: [id])
+  verificationRequest VerificationRequest? @relation(fields: [verificationRequestId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  merchantId  String
+  consentId   String?
+  attribute   String
+  proofValue  String
+  status      String
+  createdAt   DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  consent  Consent? @relation(fields: [consentId], references: [id])
+
+  @@map("transactions")
+}
+
+model PrivacyScore {
+  id                String   @id @default(cuid())
+  userId            String
+  score             Float
+  protectedFields   Int      @default(0)
+  sharedFields      Int      @default(0)
+  riskAvoided       Float    @default(0)
+  privacyLevel      String   @default("GOOD")
+  aiSuggestions     Json?
+  transactionsCount Int      @default(0)
+  month             String
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month])
+  @@map("privacy_scores")
+}
+
+model MerchantTrustScore {
+  id                  String   @id @default(cuid())
+  merchantId          String   @unique
+  score               Float    @default(50)
+  approvalRate        Float    @default(0)
+  reasonQuality       Float    @default(0)
+  minimalDisclosure   Float    @default(0)
+  complaints          Int      @default(0)
+  verificationSuccess Float    @default(0)
+  privacyCompliance   Float    @default(0)
+  totalRequests       Int      @default(0)
+  trend               Float    @default(0)
+  updatedAt           DateTime @updatedAt
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("merchant_trust_scores")
+}
+
+model TransparencyLog {
+  id                    String   @id @default(cuid())
+  userId                String
+  consentId             String?
+  verificationRequestId String?
+  requestedFields       Json
+  sharedFields          Json
+  traditionalFields     Json
+  disclosurePrevented   Float
+  transparencyScore     Float
+  privacySavedKb        Float    @default(0)
+  createdAt             DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("transparency_logs")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  permissions Permission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id        String   @id @default(cuid())
+  roleId    String
+  resource  String
+  action    String
+  createdAt DateTime @default(now())
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, resource, action])
+  @@map("permissions")
+}
+
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String?
+  merchantId String?
+  type       NotificationType
+  title      String
+  message    String
+  read       Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  merchant Merchant? @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  refreshToken String   @unique
+  deviceInfo   String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model OtpVerification {
+  id        String   @id @default(cuid())
+  email     String
+  otp       String
+  purpose   String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email, purpose])
+  @@map("otp_verifications")
+}

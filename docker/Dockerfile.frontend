@@ -11,6 +11,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY --from=deps /app/frontend/node_modules ./frontend/node_modules
 COPY frontend ./frontend
 WORKDIR /app/frontend
+RUN mkdir -p public
 RUN npm run build
 
 FROM base AS runner

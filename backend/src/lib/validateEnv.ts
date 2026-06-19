@@ -8,7 +8,16 @@ export function validateEnv(): void {
   }
 
   if ((process.env.AES_ENCRYPTION_KEY?.length ?? 0) !== 32) {
-    console.error('AES_ENCRYPTION_KEY must be exactly 32 characters');
+    console.error(`AES_ENCRYPTION_KEY must be exactly 32 characters (got ${process.env.AES_ENCRYPTION_KEY?.length ?? 0})`);
     process.exit(1);
   }
+
+  if (process.env.DATABASE_URL?.includes('-pooler.')) {
+    console.error(
+      'DATABASE_URL uses Neon pooler (-pooler in hostname). Use the DIRECT connection string from Neon (without -pooler).'
+    );
+    process.exit(1);
+  }
+
+  console.log(`Starting on PORT=${process.env.PORT || process.env.BACKEND_PORT || '4000'}`);
 }

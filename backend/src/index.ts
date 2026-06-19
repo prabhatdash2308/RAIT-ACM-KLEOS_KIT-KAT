@@ -55,8 +55,8 @@ app.use((_req, _res, next) => {
 
 app.use(errorHandler);
 
-app.listen(config.port, () => {
-  console.log(`DigiRakshak API running on port ${config.port}`);
+app.listen(config.port, '0.0.0.0', () => {
+  console.log(`DigiRakshak API running on 0.0.0.0:${config.port}`);
 });
 
 export default app;

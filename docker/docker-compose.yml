@@ -44,7 +44,7 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-digirakshak-dev-access-secret-key-32}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-digirakshak-dev-refresh-secret-key-32}
-      AES_ENCRYPTION_KEY: ${AES_ENCRYPTION_KEY:-digirakshak-dev-aes-key-32bytes!!}
+      AES_ENCRYPTION_KEY: ${AES_ENCRYPTION_KEY:-digirakshak-dev-aes-key-32bytes!}
       NODE_ENV: production
       BACKEND_PORT: 4000
       FRONTEND_URL: http://localhost:3000

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ScanLine, Camera } from 'lucide-react';
+import { Camera, CameraOff, ScanLine } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,28 +54,123 @@ interface ScanResult {
   };
 }
 
+type DetectedBarcode = { rawValue: string };
+type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => {
+  detect: (source: CanvasImageSource) => Promise<DetectedBarcode[]>;
+};
+
+declare global {
+  interface Window {
+    BarcodeDetector?: BarcodeDetectorCtor;
+  }
+}
+
 export default function ScanPage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.accessToken);
   const { toast } = useToast();
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animationRef = useRef<number | null>(null);
   const [qrInput, setQrInput] = useState('');
   const [scanning, setScanning] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [successProofs, setSuccessProofs] = useState<{ attribute: string; value: string }[]>([]);
   const [successMode, setSuccessMode] = useState('');
 
-  const handleDecode = async () => {
-    if (!token || !qrInput) return;
+  const stopCamera = () => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraActive(false);
+  };
+
+  useEffect(() => stopCamera, []);
+
+  const decodePayload = async (payload: string) => {
+    if (!token || !payload.trim()) return;
     setScanning(true);
     try {
-      const data = await verificationApi.decodeQr(token, qrInput) as ScanResult;
+      const data = await verificationApi.decodeQr(token, payload.trim()) as ScanResult;
+      stopCamera();
       setResult(data);
     } catch (err) {
       toast({ title: 'Invalid QR', description: err instanceof ApiError ? err.message : 'QR decode failed', variant: 'destructive' });
     } finally {
       setScanning(false);
+    }
+  };
+
+  const handleDecode = () => decodePayload(qrInput);
+
+  const startCameraScan = async () => {
+    if (!token || cameraActive) return;
+    setCameraError(null);
+
+    if (!window.isSecureContext) {
+      setCameraError('Camera access requires HTTPS. Use the Vercel URL or localhost for testing.');
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('This browser does not support camera access. Paste the QR payload below.');
+      return;
+    }
+    if (!window.BarcodeDetector) {
+      setCameraError('QR camera scanning is not supported in this browser. Paste the QR payload below.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraActive(true);
+
+      const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+      const scanFrame = async () => {
+        const video = videoRef.current;
+        if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+          animationRef.current = requestAnimationFrame(scanFrame);
+          return;
+        }
+
+        try {
+          const codes = await detector.detect(video);
+          const qrValue = codes.find((code) => code.rawValue)?.rawValue;
+          if (qrValue) {
+            setQrInput(qrValue);
+            await decodePayload(qrValue);
+            return;
+          }
+        } catch {
+          setCameraError('Camera scan failed. Paste the QR payload below or try again.');
+          stopCamera();
+          return;
+        }
+        animationRef.current = requestAnimationFrame(scanFrame);
+      };
+
+      animationRef.current = requestAnimationFrame(scanFrame);
+    } catch (err) {
+      const denied = err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError');
+      setCameraError(denied ? 'Camera permission was denied. Allow camera access in your browser and try again.' : 'Unable to start the camera. Check that no other app is using it.');
+      stopCamera();
     }
   };
 
@@ -143,7 +238,14 @@ export default function ScanPage() {
           <Card className="premium-card glow-primary">
             <CardContent className="pt-8">
               <div className="relative w-64 h-64 mx-auto mb-6 border-2 border-dashed border-primary/40 rounded-2xl overflow-hidden bg-primary/5">
-                <div className="absolute inset-0 flex items-center justify-center">
+                <video
+                  ref={videoRef}
+                  className={`absolute inset-0 h-full w-full object-cover ${cameraActive ? 'opacity-100' : 'opacity-0'}`}
+                  muted
+                  playsInline
+                  aria-label="QR scanner camera preview"
+                />
+                <div className={`absolute inset-0 flex items-center justify-center ${cameraActive ? 'opacity-0' : 'opacity-100'}`}>
                   <Camera className="h-16 w-16 text-primary/30" />
                 </div>
                 <motion.div
@@ -156,8 +258,24 @@ export default function ScanPage() {
                 <div className="absolute bottom-3 left-3 w-8 h-8 border-b-2 border-l-2 border-primary rounded-bl-lg" />
                 <div className="absolute bottom-3 right-3 w-8 h-8 border-b-2 border-r-2 border-primary rounded-br-lg" />
               </div>
-              <p className="text-center text-muted-foreground text-sm mb-6">Paste merchant QR payload below</p>
+              <p className="text-center text-muted-foreground text-sm mb-6">
+                {cameraActive ? 'Point your camera at the merchant QR' : 'Scan with camera or paste merchant QR payload below'}
+              </p>
+              {cameraError && (
+                <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                  {cameraError}
+                </div>
+              )}
               <div className="space-y-3">
+                <Button
+                  className="w-full gap-2"
+                  variant={cameraActive ? 'outline' : 'default'}
+                  onClick={cameraActive ? stopCamera : startCameraScan}
+                  disabled={scanning}
+                >
+                  {cameraActive ? <CameraOff className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+                  {cameraActive ? 'Stop Camera' : 'Allow Camera & Scan'}
+                </Button>
                 <Input placeholder="Paste QR payload JSON..." value={qrInput} onChange={(e) => setQrInput(e.target.value)} className="font-mono text-xs" />
                 <Button className="w-full gap-2" onClick={handleDecode} disabled={scanning || !qrInput}>
                   <ScanLine className="h-4 w-4" />

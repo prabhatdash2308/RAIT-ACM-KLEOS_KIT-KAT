@@ -3,7 +3,6 @@ builder = "dockerfile"
 dockerfilePath = "docker/Dockerfile.backend"
 
 [deploy]
-preDeployCommand = "npx prisma migrate deploy --schema=../prisma/schema.prisma"
 healthcheckPath = "/health"
 healthcheckTimeout = 600
 restartPolicyType = "ON_FAILURE"

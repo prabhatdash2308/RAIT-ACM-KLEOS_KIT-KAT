@@ -51,7 +51,7 @@ digirakshak/
 chmod +x scripts/start.sh && ./scripts/start.sh
 ```
 
-Access the app at **http://localhost:3000**
+Access the app at **https://rait-acm-kleos-kit-f0lhh2e9v-venomskull25s-projects.vercel.app**
 
 ### Manual Development Setup
 
@@ -76,10 +76,6 @@ npm run db:seed
 cd ..
 npm run dev
 ```
-
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:4000
-- Health check: http://localhost:4000/health
 
 ## Demo Accounts
 
@@ -160,14 +156,6 @@ cd frontend && npm test     # Frontend tests
 | Database | Neon PostgreSQL |
 | Redis | Upstash |
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed deployment instructions.
-
-## Documentation
-
-- [API Documentation](docs/API.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Database Schema](docs/DATABASE.md)
-- [Deployment Guide](docs/DEPLOYMENT.md)
 
 ## License
 
